@@ -4,8 +4,6 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
 class DemoView extends StatefulWidget {
-  static const routeName = '/sample_item';
-
   const DemoView({super.key});
 
   @override
