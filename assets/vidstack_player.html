@@ -49,6 +49,17 @@
                 hls.p2pEngine.addEventListener("onPeerConnect", (params) => {
                   onPeerConnect.postMessage(JSON.stringify(params));
                 });
+
+                hls.p2pEngine.addEventListener("onPeerClose", (params) => {
+                  onPeerClose.postMessage(JSON.stringify(params));
+                });
+
+                hls.p2pEngine.addEventListener(
+                  "onChunkDownloaded",
+                  (params) => {
+                    onChunkDownloaded.postMessage(JSON.stringify(params));
+                  }
+                );
               },
             },
           };

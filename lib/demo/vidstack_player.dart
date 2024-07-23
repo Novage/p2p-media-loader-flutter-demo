@@ -1,9 +1,12 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
+
+double convertToMiB(double bytes) {
+  return bytes / 1024 / 1024;
+}
 
 class VidstackPlayer extends StatefulWidget {
   const VidstackPlayer({super.key});
@@ -17,6 +20,8 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
   final double aspectRatio = 16 / 9;
   List<String> activePeers = [];
   double chunkCount = 0;
+  double totalHttpDownloaded = 0;
+  double totalP2PDownloaded = 0;
 
   @override
   void initState() {
@@ -44,6 +49,33 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
         setState(() {
           activePeers.add(peerToAdd);
         });
+      })
+      ..addJavaScriptChannel("onPeerClose",
+          onMessageReceived: (JavaScriptMessage msg) {
+        final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
+        final String peerToRemove = msgData['peerId'] ?? '';
+
+        if (peerToRemove.isEmpty) return;
+
+        setState(() {
+          activePeers.remove(peerToRemove);
+        });
+      })
+      ..addJavaScriptChannel("onChunkDownloaded",
+          onMessageReceived: (JavaScriptMessage msg) {
+        final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
+        final double loadedBytes = msgData['bytesLength'] ?? 0;
+        final String downloadSource = msgData['downloadSource'] ?? '';
+
+        if (downloadSource == 'http') {
+          setState(() {
+            totalHttpDownloaded += convertToMiB(loadedBytes);
+          });
+        } else if (downloadSource == 'p2p') {
+          setState(() {
+            totalP2PDownloaded += convertToMiB(loadedBytes);
+          });
+        }
       });
 
     var platform = controller.platform;
@@ -76,7 +108,8 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
             ),
             const SizedBox(height: 20),
             Text('Active Peers: ${activePeers.join(', ')}'),
-            Text('Chunk Count: $chunkCount'),
+            Text(
+                'Downloaded through HTTP: ${totalHttpDownloaded.toStringAsFixed(2)} MiB'),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
