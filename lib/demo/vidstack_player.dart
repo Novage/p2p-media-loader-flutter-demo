@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ffi';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -59,9 +60,9 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
 
   void _onPeerConnected(JavaScriptMessage msg) {
     final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
-    final String peerToAdd = msgData['peerId'] ?? '';
+    final peerToAdd = msgData['peerId'] as String?;
 
-    if (peerToAdd.isEmpty) return;
+    if (peerToAdd == null) return;
 
     setState(() {
       activePeers.add(peerToAdd);
@@ -70,9 +71,9 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
 
   void _onPeerClose(JavaScriptMessage msg) {
     final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
-    final String peerToRemove = msgData['peerId'] ?? '';
+    final peerToRemove = msgData['peerId'] as String?;
 
-    if (peerToRemove.isEmpty) return;
+    if (peerToRemove == null) return;
 
     setState(() {
       activePeers.remove(peerToRemove);
@@ -81,8 +82,10 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
 
   void _onChunkDownloaded(JavaScriptMessage msg) {
     final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
-    final double loadedBytes = (msgData['bytesLength'] ?? 0).toDouble();
-    final String downloadSource = msgData['downloadSource'] ?? '';
+    final loadedBytes = msgData['bytesLength'] as double?;
+    final downloadSource = msgData['downloadSource'] as String?;
+
+    if (loadedBytes == null || downloadSource == null) return;
 
     setState(() {
       if (downloadSource == 'http') {
