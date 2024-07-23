@@ -60,7 +60,7 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
     final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
     final peerToAdd = msgData['peerId'] as String?;
 
-    if (peerToAdd == null) return;
+    if (peerToAdd == null || peerToAdd.isEmpty) return;
 
     setState(() {
       activePeers.add(peerToAdd);
@@ -71,7 +71,7 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
     final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
     final peerToRemove = msgData['peerId'] as String?;
 
-    if (peerToRemove == null) return;
+    if (peerToRemove == null || peerToRemove.isEmpty) return;
 
     setState(() {
       activePeers.remove(peerToRemove);
@@ -79,8 +79,11 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
   }
 
   void _onChunkDownloaded(JavaScriptMessage msg) {
-    final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
-    final loadedBytes = msgData['bytesLength'] as double?;
+    final msgData = jsonDecode(msg.message) as Map<String, dynamic>?;
+
+    if (msgData == null) return;
+
+    final loadedBytes = (msgData['bytesLength'] as num?)?.toDouble();
     final downloadSource = msgData['downloadSource'] as String?;
 
     if (loadedBytes == null || downloadSource == null) return;
