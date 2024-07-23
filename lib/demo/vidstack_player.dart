@@ -4,6 +4,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
+// Helper function to convert bytes to MiB
 double convertToMiB(double bytes) {
   return bytes / 1024 / 1024;
 }
@@ -19,13 +20,17 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
   late final WebViewController controller;
   final double aspectRatio = 16 / 9;
   List<String> activePeers = [];
-  double chunkCount = 0;
   double totalHttpDownloaded = 0;
   double totalP2PDownloaded = 0;
 
   @override
   void initState() {
     super.initState();
+    _initializeWebViewController();
+    controller.loadFlutterAsset('assets/vidstack_player.html');
+  }
+
+  void _initializeWebViewController() {
     late final PlatformWebViewControllerCreationParams params;
 
     if (WebViewPlatform.instance is WebKitWebViewPlatform) {
@@ -40,51 +45,52 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
     controller = WebViewController.fromPlatformCreationParams(params)
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..addJavaScriptChannel("onPeerConnected",
-          onMessageReceived: (JavaScriptMessage msg) {
-        final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
-        final String peerToAdd = msgData['peerId'] ?? '';
-
-        if (peerToAdd.isEmpty) return;
-
-        setState(() {
-          activePeers.add(peerToAdd);
-        });
-      })
-      ..addJavaScriptChannel("onPeerClose",
-          onMessageReceived: (JavaScriptMessage msg) {
-        final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
-        final String peerToRemove = msgData['peerId'] ?? '';
-
-        if (peerToRemove.isEmpty) return;
-
-        setState(() {
-          activePeers.remove(peerToRemove);
-        });
-      })
+          onMessageReceived: _onPeerConnected)
+      ..addJavaScriptChannel("onPeerClose", onMessageReceived: _onPeerClose)
       ..addJavaScriptChannel("onChunkDownloaded",
-          onMessageReceived: (JavaScriptMessage msg) {
-        final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
-        final double loadedBytes = msgData['bytesLength'] ?? 0;
-        final String downloadSource = msgData['downloadSource'] ?? '';
-
-        if (downloadSource == 'http') {
-          setState(() {
-            totalHttpDownloaded += convertToMiB(loadedBytes);
-          });
-        } else if (downloadSource == 'p2p') {
-          setState(() {
-            totalP2PDownloaded += convertToMiB(loadedBytes);
-          });
-        }
-      });
+          onMessageReceived: _onChunkDownloaded);
 
     var platform = controller.platform;
 
     if (platform is AndroidWebViewController) {
       platform.setMediaPlaybackRequiresUserGesture(false);
     }
+  }
 
-    controller.loadFlutterAsset('assets/vidstack_player.html');
+  void _onPeerConnected(JavaScriptMessage msg) {
+    final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
+    final String peerToAdd = msgData['peerId'] ?? '';
+
+    if (peerToAdd.isEmpty) return;
+
+    setState(() {
+      activePeers.add(peerToAdd);
+    });
+  }
+
+  void _onPeerClose(JavaScriptMessage msg) {
+    final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
+    final String peerToRemove = msgData['peerId'] ?? '';
+
+    if (peerToRemove.isEmpty) return;
+
+    setState(() {
+      activePeers.remove(peerToRemove);
+    });
+  }
+
+  void _onChunkDownloaded(JavaScriptMessage msg) {
+    final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
+    final double loadedBytes = (msgData['bytesLength'] ?? 0).toDouble();
+    final String downloadSource = msgData['downloadSource'] ?? '';
+
+    setState(() {
+      if (downloadSource == 'http') {
+        totalHttpDownloaded += convertToMiB(loadedBytes);
+      } else if (downloadSource == 'p2p') {
+        totalP2PDownloaded += convertToMiB(loadedBytes);
+      }
+    });
   }
 
   @override
@@ -102,26 +108,27 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
             SizedBox(
               width: webViewWidth,
               height: webViewHeight,
-              child: WebViewWidget(
-                controller: controller,
-              ),
+              child: WebViewWidget(controller: controller),
             ),
             const SizedBox(height: 20),
-            Text('Active Peers: ${activePeers.join(', ')}'),
-            Text(
-                'Downloaded through HTTP: ${totalHttpDownloaded.toStringAsFixed(2)} MiB'),
+            _buildInfoText(),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  chunkCount++;
-                });
-              },
-              child: const Text('Click Me'),
-            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildInfoText() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Active Peers: ${activePeers.join(', ')}'),
+        Text(
+            'Downloaded through HTTP: ${totalHttpDownloaded.toStringAsFixed(2)} MiB'),
+        Text(
+            'Downloaded through P2P: ${totalP2PDownloaded.toStringAsFixed(2)} MiB'),
+      ],
     );
   }
 }

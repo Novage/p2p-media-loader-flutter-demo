@@ -56,7 +56,11 @@
 
                 hls.p2pEngine.addEventListener(
                   "onChunkDownloaded",
-                  (params) => {
+                  (bytesLength, downloadSource) => {
+                    const params = {
+                      bytesLength,
+                      downloadSource,
+                    };
                     onChunkDownloaded.postMessage(JSON.stringify(params));
                   }
                 );
