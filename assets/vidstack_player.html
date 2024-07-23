@@ -43,25 +43,12 @@
           provider.config = {
             p2p: {
               core: {
-                swarmId: "Optional custom swarm ID for stream",
+                // swarmId: "Optional custom swarm ID for stream",
               },
               onHlsJsCreated: (hls) => {
                 hls.p2pEngine.addEventListener("onPeerConnect", (params) => {
-                  window.flutter_inappwebview.callHandler(
-                    "onPeerConnect",
-                    params
-                  );
+                  onPeerConnect.postMessage(JSON.stringify(params));
                 });
-
-                hls.p2pEngine.addEventListener(
-                  "onChunkDownloaded",
-                  (params) => {
-                    window.flutter_inappwebview.callHandler(
-                      "onChunkDownloaded",
-                      params
-                    );
-                  }
-                );
               },
             },
           };

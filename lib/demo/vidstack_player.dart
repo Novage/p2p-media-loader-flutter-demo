@@ -44,19 +44,12 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
         setState(() {
           activePeers.add(peerToAdd);
         });
-      })
-      ..addJavaScriptChannel("onChunkDownloaded",
-          onMessageReceived: (JavaScriptMessage msg) {
-        setState(() {
-          chunkCount++;
-        });
       });
 
     var platform = controller.platform;
 
     if (platform is AndroidWebViewController) {
       platform.setMediaPlaybackRequiresUserGesture(false);
-      AndroidWebViewController.enableDebugging(true);
     }
 
     controller.loadFlutterAsset('assets/vidstack_player.html');
@@ -87,7 +80,9 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                // Handle button press
+                setState(() {
+                  chunkCount++;
+                });
               },
               child: const Text('Click Me'),
             ),
