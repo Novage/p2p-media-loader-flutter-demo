@@ -1,11 +1,9 @@
 import 'dart:convert';
-import 'dart:ffi';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
-// Helper function to convert bytes to MiB
 double convertToMiB(double bytes) {
   return bytes / 1024 / 1024;
 }
