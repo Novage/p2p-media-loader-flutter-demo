@@ -21,6 +21,7 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
   List<String> activePeers = [];
   double totalHttpDownloaded = 0;
   double totalP2PDownloaded = 0;
+  double totalP2PUploaded = 0;
 
   @override
   void initState() {
@@ -47,13 +48,26 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
           onMessageReceived: _onPeerConnected)
       ..addJavaScriptChannel("onPeerClose", onMessageReceived: _onPeerClose)
       ..addJavaScriptChannel("onChunkDownloaded",
-          onMessageReceived: _onChunkDownloaded);
+          onMessageReceived: _onChunkDownloaded)
+      ..addJavaScriptChannel("onChunkUploaded",
+          onMessageReceived: _onChunkUploaded);
 
     var platform = controller.platform;
 
     if (platform is AndroidWebViewController) {
       platform.setMediaPlaybackRequiresUserGesture(false);
     }
+  }
+
+  void _onChunkUploaded(JavaScriptMessage msg) {
+    final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
+    final uploadedBytes = (msgData['uploadedBytes'] as num?)?.toDouble();
+
+    if (uploadedBytes == null) return;
+
+    setState(() {
+      totalP2PUploaded += convertToMiB(uploadedBytes);
+    });
   }
 
   void _onPeerConnected(JavaScriptMessage msg) {
@@ -79,20 +93,17 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
   }
 
   void _onChunkDownloaded(JavaScriptMessage msg) {
-    final msgData = jsonDecode(msg.message) as Map<String, dynamic>?;
-
-    if (msgData == null) return;
-
-    final loadedBytes = (msgData['bytesLength'] as num?)?.toDouble();
+    final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
+    final downloadedBytes = (msgData['downloadedBytes'] as num?)?.toDouble();
     final downloadSource = msgData['downloadSource'] as String?;
 
-    if (loadedBytes == null || downloadSource == null) return;
+    if (downloadedBytes == null || downloadSource == null) return;
 
     setState(() {
       if (downloadSource == 'http') {
-        totalHttpDownloaded += convertToMiB(loadedBytes);
+        totalHttpDownloaded += convertToMiB(downloadedBytes);
       } else if (downloadSource == 'p2p') {
-        totalP2PDownloaded += convertToMiB(loadedBytes);
+        totalP2PDownloaded += convertToMiB(downloadedBytes);
       }
     });
   }
