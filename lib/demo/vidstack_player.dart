@@ -115,7 +115,7 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Demo Component'),
+        title: const Text('Vidstack Player'),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -126,7 +126,7 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
               child: WebViewWidget(controller: controller),
             ),
             const SizedBox(height: 20),
-            _buildInfoText(),
+            _buildInfoCards(),
             const SizedBox(height: 20),
           ],
         ),
@@ -134,16 +134,49 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
     );
   }
 
-  Widget _buildInfoText() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Active Peers: ${activePeers.join(', ')}'),
-        Text(
-            'Downloaded through HTTP: ${totalHttpDownloaded.toStringAsFixed(2)} MiB'),
-        Text(
-            'Downloaded through P2P: ${totalP2PDownloaded.toStringAsFixed(2)} MiB'),
-      ],
+  Widget _buildInfoCards() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        children: [
+          _buildCard(
+            title: 'Downloaded through HTTP',
+            content: '${totalHttpDownloaded.toStringAsFixed(2)} MiB',
+            icon: Icons.download,
+          ),
+          const SizedBox(height: 10),
+          _buildCard(
+            title: 'Downloaded through P2P',
+            content: '${totalP2PDownloaded.toStringAsFixed(2)} MiB',
+            icon: Icons.cloud_download,
+          ),
+          const SizedBox(height: 10),
+          _buildCard(
+            title: 'Uploaded through P2P',
+            content: '${totalP2PUploaded.toStringAsFixed(2)} MiB',
+            icon: Icons.cloud_upload,
+          ),
+          const SizedBox(height: 10),
+          _buildCard(
+            title: 'Active Peers',
+            content: activePeers.length.toString(),
+            icon: Icons.group,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCard(
+      {required String title,
+      required String content,
+      required IconData icon}) {
+    return Card(
+      child: ListTile(
+        leading: Icon(icon, color: Theme.of(context).primaryColor),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(content),
+      ),
     );
   }
 }
