@@ -44,7 +44,7 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
 
     controller = WebViewController.fromPlatformCreationParams(params)
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..addJavaScriptChannel("onPeerConnected",
+      ..addJavaScriptChannel("onPeerConnect",
           onMessageReceived: _onPeerConnected)
       ..addJavaScriptChannel("onPeerClose", onMessageReceived: _onPeerClose)
       ..addJavaScriptChannel("onChunkDownloaded",
