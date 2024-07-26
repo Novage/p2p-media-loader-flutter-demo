@@ -17,6 +17,139 @@
     <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
 
     <script src="https://cdn.vidstack.io/player" type="module"></script>
+    <script type="module">
+      import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
+
+      class P2P {
+        constructor() {
+          this.player = document.querySelector("media-player");
+          this.hlsP2PEngine = null;
+          this.stats = {
+            httpDownloadedBytes: 0,
+            p2pDownloadedBytes: 0,
+            p2pUploadedBytes: 0,
+          };
+
+          this.init();
+        }
+
+        init = () => {
+          this.setupEventListeners();
+          this.startStatsInterval();
+        };
+
+        setupEventListeners = () => {
+          this.player.addEventListener(
+            "provider-change",
+            this.onProviderChange
+          );
+        };
+
+        onProviderChange = (event) => {
+          const provider = event.detail;
+          if (provider?.type === "hls") {
+            this.setupHlsProvider(provider);
+          }
+        };
+
+        setupHlsProvider = (provider) => {
+          const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
+          provider.library = HlsWithP2P;
+          provider.config = {
+            p2p: {
+              onHlsJsCreated: this.onHlsJsCreated,
+            },
+          };
+        };
+
+        onHlsJsCreated = (hls) => {
+          this.hlsP2PEngine = hls.p2pEngine;
+          this.setupP2PEventListeners(hls.p2pEngine);
+        };
+
+        setupP2PEventListeners = (p2pEngine) => {
+          p2pEngine.addEventListener("onPeerConnect", this.onPeerConnect);
+          p2pEngine.addEventListener("onPeerClose", this.onPeerClose);
+          p2pEngine.addEventListener(
+            "onChunkDownloaded",
+            this.onChunkDownloaded
+          );
+          p2pEngine.addEventListener("onChunkUploaded", this.onChunkUploaded);
+        };
+
+        onPeerConnect = (params) => {
+          window.onPeerConnect?.postMessage(JSON.stringify(params));
+        };
+
+        onPeerClose = (params) => {
+          window.onPeerClose?.postMessage(JSON.stringify(params));
+        };
+
+        onChunkDownloaded = (bytesLength, downloadSource) => {
+          if (downloadSource === "http") {
+            this.stats.httpDownloadedBytes += bytesLength;
+          } else if (downloadSource === "p2p") {
+            this.stats.p2pDownloadedBytes += bytesLength;
+          }
+        };
+
+        onChunkUploaded = (bytesLength) => {
+          this.stats.p2pUploadedBytes += bytesLength;
+        };
+
+        startStatsInterval = () => {
+          setInterval(this.postStats, 1000);
+        };
+
+        postStats = () => {
+          if (this.stats.p2pUploadedBytes > 0) {
+            this.postUploadStats(this.stats.p2pUploadedBytes);
+            this.stats.p2pUploadedBytes = 0;
+          }
+
+          if (this.stats.httpDownloadedBytes > 0) {
+            this.postDownloadStats(this.stats.httpDownloadedBytes, "http");
+            this.stats.httpDownloadedBytes = 0;
+          }
+
+          if (this.stats.p2pDownloadedBytes > 0) {
+            this.postDownloadStats(this.stats.p2pDownloadedBytes, "p2p");
+            this.stats.p2pDownloadedBytes = 0;
+          }
+        };
+
+        postDownloadStats = (downloadedBytes, downloadSource) => {
+          const stats = { downloadedBytes, downloadSource };
+          window.onChunkDownloaded?.postMessage(JSON.stringify(stats));
+        };
+
+        postUploadStats = (uploadedBytes) => {
+          const stats = { uploadedBytes };
+          window.onChunkUploaded?.postMessage(JSON.stringify(stats));
+        };
+
+        destroyP2P = () => {
+          if (!this.hlsP2PEngine) return;
+          this.hlsP2PEngine.destroy();
+          this.hlsP2PEngine = null;
+        };
+
+        updateP2PState = (isDisabled) => {
+          if (!this.hlsP2PEngine) return;
+          const currentState =
+            this.hlsP2PEngine.getConfig().core.mainStream.isP2PDisabled;
+          if (currentState === isDisabled) return;
+          this.hlsP2PEngine.applyDynamicConfig({
+            core: { isP2PDisabled: isDisabled },
+          });
+        };
+      }
+
+      const p2p = new P2P();
+
+      window.destroyP2P = p2p.destroyP2P;
+      window.updateP2PState = p2p.updateP2PState;
+    </script>
 
     <style>
       html,
@@ -27,118 +160,6 @@
         background-color: transparent;
       }
     </style>
-
-    <script type="module">
-      import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
-
-      let hlsP2PEngine;
-
-      function destroyP2P() {
-        if (!hlsP2PEngine) return;
-
-        hlsP2PEngine.destroy();
-        hlsP2PEngine = null;
-      }
-
-      function updateP2PState(isDisabled) {
-        if (!hlsP2PEngine) return;
-
-        const isP2PDisabled =
-          hlsP2PEngine.getConfig().core.mainStream.isP2PDisabled;
-
-        if (isP2PDisabled === isDisabled) return;
-
-        hlsP2PEngine.applyDynamicConfig({
-          core: {
-            isP2PDisabled: isDisabled,
-          },
-        });
-      }
-
-      window.destroyP2P = destroyP2P;
-      window.updateP2PState = updateP2PState;
-
-      let httpDownloadedBytes = 0;
-      let p2pDownloadedBytes = 0;
-      let p2pUploadedBytes = 0;
-
-      function postDownloadStats(downloadedBytes, downloadSource) {
-        const stats = {
-          downloadedBytes,
-          downloadSource,
-        };
-        onChunkDownloaded.postMessage(JSON.stringify(stats));
-      }
-
-      function postUploadStats(uploadedBytes) {
-        const stats = {
-          uploadedBytes,
-        };
-        onChunkUploaded.postMessage(JSON.stringify(stats));
-      }
-
-      const player = document.querySelector("media-player");
-
-      player.addEventListener("provider-change", (event) => {
-        const provider = event.detail;
-
-        if (provider?.type === "hls") {
-          const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
-          provider.library = HlsWithP2P;
-
-          provider.config = {
-            p2p: {
-              onHlsJsCreated: (hls) => {
-                hlsP2PEngine = hls.p2pEngine;
-
-                hls.p2pEngine.addEventListener("onPeerConnect", (params) => {
-                  onPeerConnect.postMessage(JSON.stringify(params));
-                });
-
-                hls.p2pEngine.addEventListener("onPeerClose", (params) => {
-                  onPeerClose.postMessage(JSON.stringify(params));
-                });
-
-                hls.p2pEngine.addEventListener(
-                  "onChunkDownloaded",
-                  (bytesLength, downloadSource) => {
-                    if (downloadSource === "http") {
-                      httpDownloadedBytes += bytesLength;
-                    } else if (downloadSource === "p2p") {
-                      p2pDownloadedBytes += bytesLength;
-                    }
-                  }
-                );
-
-                hls.p2pEngine.addEventListener(
-                  "onChunkUploaded",
-                  (bytesLength) => {
-                    p2pUploadedBytes += bytesLength;
-                  }
-                );
-              },
-            },
-          };
-        }
-      });
-
-      setInterval(() => {
-        if (p2pUploadedBytes > 0) {
-          postUploadStats(p2pUploadedBytes);
-          p2pUploadedBytes = 0;
-        }
-
-        if (httpDownloadedBytes > 0) {
-          postDownloadStats(httpDownloadedBytes, "http");
-          httpDownloadedBytes = 0;
-        }
-
-        if (p2pDownloadedBytes > 0) {
-          postDownloadStats(p2pDownloadedBytes, "p2p");
-          p2pDownloadedBytes = 0;
-        }
-      }, 1000);
-    </script>
   </head>
 
   <body>
