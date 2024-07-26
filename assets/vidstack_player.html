@@ -98,7 +98,12 @@
         };
 
         startStatsInterval = () => {
-          setInterval(this.postStats, 1000);
+          this.statsInterval = setInterval(this.postStats, 1000);
+        };
+
+        stopStatsInterval = () => {
+          clearInterval(this.statsInterval);
+          this.statsInterval = undefined;
         };
 
         postStats = () => {
@@ -129,19 +134,46 @@
         };
 
         destroyP2P = () => {
+          this.stopStatsInterval();
           if (!this.hlsP2PEngine) return;
+
+          this.hlsP2PEngine.removeEventListener(
+            "onPeerConnect",
+            this.onPeerConnect
+          );
+          this.hlsP2PEngine.removeEventListener(
+            "onPeerClose",
+            this.onPeerClose
+          );
+          this.hlsP2PEngine.removeEventListener(
+            "onChunkDownloaded",
+            this.onChunkDownloaded
+          );
+          this.hlsP2PEngine.removeEventListener(
+            "onChunkUploaded",
+            this.onChunkUploaded
+          );
+
           this.hlsP2PEngine.destroy();
-          this.hlsP2PEngine = null;
+          this.hlsP2PEngine = undefined;
         };
 
         updateP2PState = (isDisabled) => {
           if (!this.hlsP2PEngine) return;
           const currentState =
             this.hlsP2PEngine.getConfig().core.mainStream.isP2PDisabled;
+
           if (currentState === isDisabled) return;
+
           this.hlsP2PEngine.applyDynamicConfig({
             core: { isP2PDisabled: isDisabled },
           });
+
+          if (isDisabled) {
+            this.stopStatsInterval();
+          } else {
+            this.startStatsInterval();
+          }
         };
       }
 
