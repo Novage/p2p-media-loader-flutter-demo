@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
+import 'p2p_stats.dart';
 
-double convertToMiB(double bytes) {
-  return bytes / 1024 / 1024;
-}
+const double kAspectRatio = 16 / 9;
+const String kVidstackPlayerHtml = 'assets/vidstack_player.html';
+
+double convertToMiB(double bytes) => bytes / 1024 / 1024;
 
 class VidstackPlayer extends StatefulWidget {
   const VidstackPlayer({super.key});
@@ -17,8 +19,7 @@ class VidstackPlayer extends StatefulWidget {
 
 class _VidstackPlayerState extends State<VidstackPlayer>
     with WidgetsBindingObserver {
-  late final WebViewController controller;
-  final double aspectRatio = 16 / 9;
+  late final WebViewController _controller;
   List<String> activePeers = [];
   double totalHttpDownloaded = 0;
   double totalP2PDownloaded = 0;
@@ -29,7 +30,6 @@ class _VidstackPlayerState extends State<VidstackPlayer>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeWebViewController();
-    controller.loadFlutterAsset('assets/vidstack_player.html');
   }
 
   @override
@@ -51,7 +51,7 @@ class _VidstackPlayerState extends State<VidstackPlayer>
       params = const PlatformWebViewControllerCreationParams();
     }
 
-    controller = WebViewController.fromPlatformCreationParams(params)
+    _controller = WebViewController.fromPlatformCreationParams(params)
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..addJavaScriptChannel("onPeerConnect",
           onMessageReceived: _onPeerConnected)
@@ -59,12 +59,12 @@ class _VidstackPlayerState extends State<VidstackPlayer>
       ..addJavaScriptChannel("onChunkDownloaded",
           onMessageReceived: _onChunkDownloaded)
       ..addJavaScriptChannel("onChunkUploaded",
-          onMessageReceived: _onChunkUploaded);
+          onMessageReceived: _onChunkUploaded)
+      ..loadFlutterAsset(kVidstackPlayerHtml);
 
-    var platform = controller.platform;
-
-    if (platform is AndroidWebViewController) {
-      platform.setMediaPlaybackRequiresUserGesture(false);
+    if (_controller.platform is AndroidWebViewController) {
+      (_controller.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
     }
   }
 
@@ -81,36 +81,27 @@ class _VidstackPlayerState extends State<VidstackPlayer>
     if (!mounted) return;
     final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
     final uploadedBytes = (msgData['uploadedBytes'] as num?)?.toDouble();
-
     if (uploadedBytes == null) return;
 
-    setState(() {
-      totalP2PUploaded += convertToMiB(uploadedBytes);
-    });
+    setState(() => totalP2PUploaded += convertToMiB(uploadedBytes));
   }
 
   void _onPeerConnected(JavaScriptMessage msg) {
     if (!mounted) return;
     final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
     final peerToAdd = msgData['peerId'] as String?;
-
     if (peerToAdd == null || peerToAdd.isEmpty) return;
 
-    setState(() {
-      activePeers.add(peerToAdd);
-    });
+    setState(() => activePeers.add(peerToAdd));
   }
 
   void _onPeerClose(JavaScriptMessage msg) {
     if (!mounted) return;
     final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
     final peerToRemove = msgData['peerId'] as String?;
-
     if (peerToRemove == null || peerToRemove.isEmpty) return;
 
-    setState(() {
-      activePeers.remove(peerToRemove);
-    });
+    setState(() => activePeers.remove(peerToRemove));
   }
 
   void _onChunkDownloaded(JavaScriptMessage msg) {
@@ -118,7 +109,6 @@ class _VidstackPlayerState extends State<VidstackPlayer>
     final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
     final downloadedBytes = (msgData['downloadedBytes'] as num?)?.toDouble();
     final downloadSource = msgData['downloadSource'] as String?;
-
     if (downloadedBytes == null || downloadSource == null) return;
 
     setState(() {
@@ -131,17 +121,17 @@ class _VidstackPlayerState extends State<VidstackPlayer>
   }
 
   void _updateP2PState(bool isP2PDisabled) {
-    controller.runJavaScript("window.updateP2PState($isP2PDisabled)");
+    _controller.runJavaScript("window.updateP2PState($isP2PDisabled)");
   }
 
   void _destroyP2P() {
-    controller.runJavaScript("window.destroyP2P()");
+    _controller.runJavaScript("window.destroyP2P()");
   }
 
   @override
   Widget build(BuildContext context) {
     final double webViewWidth = MediaQuery.of(context).size.width;
-    final double webViewHeight = webViewWidth / aspectRatio;
+    final double webViewHeight = webViewWidth / kAspectRatio;
 
     return Scaffold(
       appBar: AppBar(
@@ -153,65 +143,17 @@ class _VidstackPlayerState extends State<VidstackPlayer>
             SizedBox(
               width: webViewWidth,
               height: webViewHeight,
-              child: WebViewWidget(controller: controller),
+              child: WebViewWidget(controller: _controller),
             ),
             const SizedBox(height: 20),
-            _buildInfoCards(),
-            const SizedBox(height: 20),
-            ElevatedButton(
-                onPressed: () => _updateP2PState(true),
-                child: const Text('disable P2P')),
-            ElevatedButton(
-                onPressed: () => _updateP2PState(false),
-                child: const Text('enable P2P')),
+            P2PStats(
+              totalHttpDownloaded: totalHttpDownloaded,
+              totalP2PDownloaded: totalP2PDownloaded,
+              totalP2PUploaded: totalP2PUploaded,
+              activePeers: activePeers,
+            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildInfoCards() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        children: [
-          _buildCard(
-            title: 'Downloaded through HTTP',
-            content: '${totalHttpDownloaded.toStringAsFixed(2)} MiB',
-            icon: Icons.download,
-          ),
-          const SizedBox(height: 10),
-          _buildCard(
-            title: 'Downloaded through P2P',
-            content: '${totalP2PDownloaded.toStringAsFixed(2)} MiB',
-            icon: Icons.cloud_download,
-          ),
-          const SizedBox(height: 10),
-          _buildCard(
-            title: 'Uploaded through P2P',
-            content: '${totalP2PUploaded.toStringAsFixed(2)} MiB',
-            icon: Icons.cloud_upload,
-          ),
-          const SizedBox(height: 10),
-          _buildCard(
-            title: 'Active Peers',
-            content: activePeers.length.toString(),
-            icon: Icons.group,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCard(
-      {required String title,
-      required String content,
-      required IconData icon}) {
-    return Card(
-      child: ListTile(
-        leading: Icon(icon, color: Theme.of(context).primaryColor),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(content),
       ),
     );
   }
