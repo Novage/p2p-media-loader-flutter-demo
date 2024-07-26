@@ -31,6 +31,33 @@
     <script type="module">
       import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 
+      let hlsP2PEngine;
+
+      function destroyP2P() {
+        if (!hlsP2PEngine) return;
+
+        hlsP2PEngine.destroy();
+        hlsP2PEngine = null;
+      }
+
+      function updateP2PState(isDisabled) {
+        if (!hlsP2PEngine) return;
+
+        const isP2PDisabled =
+          hlsP2PEngine.getConfig().core.mainStream.isP2PDisabled;
+
+        if (isP2PDisabled === isDisabled) return;
+
+        hlsP2PEngine.applyDynamicConfig({
+          core: {
+            isP2PDisabled: isDisabled,
+          },
+        });
+      }
+
+      window.destroyP2P = destroyP2P;
+      window.updateP2PState = updateP2PState;
+
       let httpDownloadedBytes = 0;
       let p2pDownloadedBytes = 0;
       let p2pUploadedBytes = 0;
@@ -62,6 +89,8 @@
           provider.config = {
             p2p: {
               onHlsJsCreated: (hls) => {
+                hlsP2PEngine = hls.p2pEngine;
+
                 hls.p2pEngine.addEventListener("onPeerConnect", (params) => {
                   onPeerConnect.postMessage(JSON.stringify(params));
                 });
@@ -116,7 +145,7 @@
     <div>
       <media-player
         playsInline
-        src="https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8"
+        src="https://cph-p2p-msl.akamaized.net//hls/live/2000341/test/master.m3u8"
       >
         <media-provider></media-provider>
         <media-video-layout></media-video-layout>

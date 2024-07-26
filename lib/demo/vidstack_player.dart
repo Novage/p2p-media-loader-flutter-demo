@@ -15,7 +15,8 @@ class VidstackPlayer extends StatefulWidget {
   State<VidstackPlayer> createState() => _VidstackPlayerState();
 }
 
-class _VidstackPlayerState extends State<VidstackPlayer> {
+class _VidstackPlayerState extends State<VidstackPlayer>
+    with WidgetsBindingObserver {
   late final WebViewController controller;
   final double aspectRatio = 16 / 9;
   List<String> activePeers = [];
@@ -26,8 +27,16 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeWebViewController();
     controller.loadFlutterAsset('assets/vidstack_player.html');
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _destroyP2P();
+    super.dispose();
   }
 
   void _initializeWebViewController() {
@@ -59,7 +68,17 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
     }
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _updateP2PState(false);
+    } else if (state == AppLifecycleState.paused) {
+      _updateP2PState(true);
+    }
+  }
+
   void _onChunkUploaded(JavaScriptMessage msg) {
+    if (!mounted) return;
     final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
     final uploadedBytes = (msgData['uploadedBytes'] as num?)?.toDouble();
 
@@ -71,6 +90,7 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
   }
 
   void _onPeerConnected(JavaScriptMessage msg) {
+    if (!mounted) return;
     final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
     final peerToAdd = msgData['peerId'] as String?;
 
@@ -82,6 +102,7 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
   }
 
   void _onPeerClose(JavaScriptMessage msg) {
+    if (!mounted) return;
     final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
     final peerToRemove = msgData['peerId'] as String?;
 
@@ -93,6 +114,7 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
   }
 
   void _onChunkDownloaded(JavaScriptMessage msg) {
+    if (!mounted) return;
     final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
     final downloadedBytes = (msgData['downloadedBytes'] as num?)?.toDouble();
     final downloadSource = msgData['downloadSource'] as String?;
@@ -106,6 +128,14 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
         totalP2PDownloaded += convertToMiB(downloadedBytes);
       }
     });
+  }
+
+  void _updateP2PState(bool isP2PDisabled) {
+    controller.runJavaScript("window.updateP2PState($isP2PDisabled)");
+  }
+
+  void _destroyP2P() {
+    controller.runJavaScript("window.destroyP2P()");
   }
 
   @override
@@ -128,6 +158,12 @@ class _VidstackPlayerState extends State<VidstackPlayer> {
             const SizedBox(height: 20),
             _buildInfoCards(),
             const SizedBox(height: 20),
+            ElevatedButton(
+                onPressed: () => _updateP2PState(true),
+                child: const Text('disable P2P')),
+            ElevatedButton(
+                onPressed: () => _updateP2PState(false),
+                child: const Text('enable P2P')),
           ],
         ),
       ),
