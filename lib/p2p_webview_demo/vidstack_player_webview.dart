@@ -1,20 +1,29 @@
-import 'package:demo/p2p_webview_demo/p2p_stats.dart';
-import 'package:demo/p2p_webview_demo/p2p_stats_manager.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
+double convertToMiB(double bytes) => bytes / 1024 / 1024;
+
 class VidstackWebView extends StatefulWidget {
   final String assetPath;
   final double aspectRatio;
-  final Function(P2PStats)? onStatsUpdate;
+  final Function(double)? onChunkDownloadedByHttp;
+  final Function(double)? onChunkDownloadedByP2P;
+  final Function(double)? onChunkUploaded;
+  final Function(String)? onPeerConnect;
+  final Function(String)? onPeerClose;
 
   const VidstackWebView({
     super.key,
     required this.assetPath,
     this.aspectRatio = 16 / 9,
-    this.onStatsUpdate,
+    this.onChunkDownloadedByHttp,
+    this.onChunkDownloadedByP2P,
+    this.onChunkUploaded,
+    this.onPeerConnect,
+    this.onPeerClose,
   });
 
   @override
@@ -24,13 +33,11 @@ class VidstackWebView extends StatefulWidget {
 class _VidstackWebViewState extends State<VidstackWebView>
     with WidgetsBindingObserver {
   late final WebViewController _controller;
-  late final P2PStatsManager _statsManager;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _statsManager = P2PStatsManager(onStatsUpdate: widget.onStatsUpdate);
     _initializeWebViewController();
   }
 
@@ -44,6 +51,45 @@ class _VidstackWebViewState extends State<VidstackWebView>
   void _initializeWebViewController() {
     late final PlatformWebViewControllerCreationParams params;
 
+    void onPeerConnected(JavaScriptMessage msg) {
+      final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
+      final peerToAdd = msgData['peerId'] as String?;
+      if (peerToAdd == null || peerToAdd.isEmpty) return;
+
+      widget.onPeerConnect?.call(peerToAdd);
+    }
+
+    void onPeerClose(JavaScriptMessage msg) {
+      final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
+      final peerToRemove = msgData['peerId'] as String?;
+      if (peerToRemove == null || peerToRemove.isEmpty) return;
+
+      widget.onPeerClose?.call(peerToRemove);
+    }
+
+    void onChunkDownloaded(JavaScriptMessage msg) {
+      final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
+      final downloadedBytes = (msgData['downloadedBytes'] as num?)?.toDouble();
+      final downloadSource = msgData['downloadSource'] as String?;
+      if (downloadedBytes == null || downloadSource == null) return;
+
+      final downloadedBytesInMiB = convertToMiB(downloadedBytes);
+
+      if (downloadSource == 'http') {
+        widget.onChunkDownloadedByHttp?.call(downloadedBytesInMiB);
+      } else if (downloadSource == 'p2p') {
+        widget.onChunkDownloadedByP2P?.call(downloadedBytesInMiB);
+      }
+    }
+
+    void onChunkUploaded(JavaScriptMessage msg) {
+      final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
+      final uploadedBytes = (msgData['uploadedBytes'] as num?)?.toDouble();
+      if (uploadedBytes == null) return;
+
+      widget.onChunkUploaded?.call(convertToMiB(uploadedBytes));
+    }
+
     if (WebViewPlatform.instance is WebKitWebViewPlatform) {
       params = WebKitWebViewControllerCreationParams(
         allowsInlineMediaPlayback: true,
@@ -56,19 +102,19 @@ class _VidstackWebViewState extends State<VidstackWebView>
     _controller = WebViewController.fromPlatformCreationParams(params)
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..addJavaScriptChannel("onPeerConnect",
-          onMessageReceived: _statsManager.onPeerConnected)
-      ..addJavaScriptChannel("onPeerClose",
-          onMessageReceived: _statsManager.onPeerClose)
+          onMessageReceived: onPeerConnected)
+      ..addJavaScriptChannel("onPeerClose", onMessageReceived: onPeerClose)
       ..addJavaScriptChannel("onChunkDownloaded",
-          onMessageReceived: _statsManager.onChunkDownloaded)
+          onMessageReceived: onChunkDownloaded)
       ..addJavaScriptChannel("onChunkUploaded",
-          onMessageReceived: _statsManager.onChunkUploaded)
-      ..loadFlutterAsset(widget.assetPath);
+          onMessageReceived: onChunkUploaded);
 
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController)
           .setMediaPlaybackRequiresUserGesture(false);
     }
+
+    _controller.loadFlutterAsset(widget.assetPath);
   }
 
   @override
