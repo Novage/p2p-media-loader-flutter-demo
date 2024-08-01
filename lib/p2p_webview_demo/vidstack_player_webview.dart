@@ -114,8 +114,7 @@ class _VidstackWebViewState extends State<VidstackWebView>
           .setMediaPlaybackRequiresUserGesture(false);
     }
 
-    _controller.loadRequest(
-        Uri.parse("http://192.168.1.111:3000/vidstack_player.html"));
+    _controller.loadFlutterAsset(widget.assetPath);
   }
 
   @override
