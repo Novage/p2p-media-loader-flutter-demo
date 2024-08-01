@@ -1,7 +1,7 @@
-import 'package:demo/demo/p2p_statistics.dart';
+import 'package:demo/widgets/p2p_statistics.dart';
 import 'package:flutter/material.dart';
-import 'vidstack_player_webview/p2p_stats.dart';
-import 'vidstack_player_webview/vidstack_player_webview.dart';
+import '../p2p_webview_demo/p2p_stats.dart';
+import '../p2p_webview_demo/vidstack_player_webview.dart';
 
 class VidstackPlayerScreen extends StatefulWidget {
   const VidstackPlayerScreen({super.key});

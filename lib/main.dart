@@ -1,4 +1,4 @@
-import 'package:demo/demo/vidstack_player_screen.dart';
+import 'package:demo/screens/demo_screen.dart';
 import 'package:flutter/material.dart';
 
 void main() {

@@ -1,5 +1,5 @@
-import 'package:demo/demo/vidstack_player_webview/p2p_stats.dart';
-import 'package:demo/demo/vidstack_player_webview/p2p_stats_manager.dart';
+import 'package:demo/p2p_webview_demo/p2p_stats.dart';
+import 'package:demo/p2p_webview_demo/p2p_stats_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';

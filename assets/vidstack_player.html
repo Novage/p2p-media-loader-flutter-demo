@@ -177,10 +177,12 @@
         };
       }
 
-      const p2p = new P2P();
+      document.addEventListener("DOMContentLoaded", () => {
+        const p2p = new P2P();
 
-      window.destroyP2P = p2p.destroyP2P;
-      window.updateP2PState = p2p.updateP2PState;
+        window.destroyP2P = p2p.destroyP2P;
+        window.updateP2PState = p2p.updateP2PState;
+      });
     </script>
 
     <style>
