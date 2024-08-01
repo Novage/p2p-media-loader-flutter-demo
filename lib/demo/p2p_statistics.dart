@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'info_card.dart';
 
-class P2PStats extends StatelessWidget {
+class P2PStatistics extends StatelessWidget {
   final double totalHttpDownloaded;
   final double totalP2PDownloaded;
   final double totalP2PUploaded;
   final List<String> activePeers;
 
-  const P2PStats({
+  const P2PStatistics({
     super.key,
     required this.totalHttpDownloaded,
     required this.totalP2PDownloaded,
