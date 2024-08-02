@@ -93,7 +93,6 @@
         };
 
         onChunkDownloaded = (bytesLength, downloadSource) => {
-          console.log("onChunkDownloaded", bytesLength, downloadSource);
           if (downloadSource === "http") {
             this.stats.httpDownloadedBytes += bytesLength;
           } else if (downloadSource === "p2p") {
