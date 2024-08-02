@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
@@ -42,55 +41,8 @@ class _VidstackWebViewState extends State<VidstackWebView>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _destroyP2P();
-    _controller?.dispose();
+    _cleanUpWebView();
     super.dispose();
-  }
-
-  void _initializeWebViewController(InAppWebViewController controller) {
-    _controller = controller;
-
-    _controller?.addJavaScriptHandler(
-        handlerName: 'onPeerConnect',
-        callback: (args) {
-          final peerToAdd = args[0].peerId as String?;
-          if (peerToAdd == null || peerToAdd.isEmpty) return;
-          widget.onPeerConnect?.call(peerToAdd);
-        });
-
-    _controller?.addJavaScriptHandler(
-        handlerName: 'onPeerClose',
-        callback: (args) {
-          final peerToRemove = args[0].peerId as String?;
-          if (peerToRemove == null || peerToRemove.isEmpty) return;
-          widget.onPeerClose?.call(peerToRemove);
-        });
-
-    _controller?.addJavaScriptHandler(
-        handlerName: 'onChunkDownloaded',
-        callback: (args) {
-          final downloadedBytes = (args[0] as num?)?.toDouble();
-          final downloadSource = args[1] as String?;
-          if (downloadedBytes == null || downloadSource == null) return;
-
-          final downloadedBytesInMiB = convertToMiB(downloadedBytes);
-
-          if (downloadSource == 'http') {
-            widget.onChunkDownloadedByHttp?.call(downloadedBytesInMiB);
-          } else if (downloadSource == 'p2p') {
-            widget.onChunkDownloadedByP2P?.call(downloadedBytesInMiB);
-          }
-        });
-
-    _controller?.addJavaScriptHandler(
-        handlerName: 'onChunkUploaded',
-        callback: (args) {
-          final uploadedBytes = (args[0] as num?)?.toDouble();
-          if (uploadedBytes == null) return;
-
-          widget.onChunkUploaded?.call(convertToMiB(uploadedBytes));
-        });
-
-    _controller?.loadFile(assetFilePath: widget.assetPath);
   }
 
   @override
@@ -100,6 +52,67 @@ class _VidstackWebViewState extends State<VidstackWebView>
     } else if (state == AppLifecycleState.paused) {
       _updateP2PState(true);
     }
+  }
+
+  void _cleanUpWebView() {
+    _controller?.removeJavaScriptHandler(handlerName: 'onPeerConnect');
+    _controller?.removeJavaScriptHandler(handlerName: 'onPeerClose');
+    _controller?.removeJavaScriptHandler(handlerName: 'onChunkDownloaded');
+    _controller?.removeJavaScriptHandler(handlerName: 'onChunkUploaded');
+    _controller?.dispose();
+  }
+
+  void _initializeWebViewController(InAppWebViewController controller) {
+    _controller = controller;
+    _applyJavaScriptHandlers(controller);
+    controller.loadFile(assetFilePath: widget.assetPath);
+  }
+
+  void _applyJavaScriptHandlers(InAppWebViewController controller) {
+    controller.addJavaScriptHandler(
+        handlerName: 'onPeerConnect', callback: _handlePeerConnect);
+    controller.addJavaScriptHandler(
+        handlerName: 'onPeerClose', callback: _handlePeerClose);
+    controller.addJavaScriptHandler(
+        handlerName: 'onChunkDownloaded', callback: _handleChunkDownloaded);
+    controller.addJavaScriptHandler(
+        handlerName: 'onChunkUploaded', callback: _handleChunkUploaded);
+  }
+
+  void _handlePeerConnect(List<dynamic> args) {
+    if (args.isEmpty) return;
+    final peerId = (args[0] as Map<String, dynamic>)['peerId'] as String?;
+    if (peerId == null || peerId.isEmpty) return;
+
+    widget.onPeerConnect?.call(peerId);
+  }
+
+  void _handlePeerClose(List<dynamic> args) {
+    if (args.isEmpty) return;
+    final peerId = (args[0] as Map<String, dynamic>)['peerId'] as String?;
+    if (peerId == null || peerId.isEmpty) return;
+
+    widget.onPeerClose?.call(peerId);
+  }
+
+  void _handleChunkDownloaded(List<dynamic> args) {
+    final downloadedBytes = (args[0] as num?)?.toDouble();
+    final downloadSource = args[1] as String?;
+
+    if (downloadedBytes != null && downloadSource != null) {
+      final downloadedBytesInMiB = convertToMiB(downloadedBytes);
+      if (downloadSource == 'http') {
+        widget.onChunkDownloadedByHttp?.call(downloadedBytesInMiB);
+      } else if (downloadSource == 'p2p') {
+        widget.onChunkDownloadedByP2P?.call(downloadedBytesInMiB);
+      }
+    }
+  }
+
+  void _handleChunkUploaded(List<dynamic> args) {
+    final uploadedBytes = (args[0] as num?)?.toDouble();
+    if (uploadedBytes == null) return;
+    widget.onChunkUploaded?.call(convertToMiB(uploadedBytes));
   }
 
   void _updateP2PState(bool isP2PDisabled) {
@@ -118,6 +131,10 @@ class _VidstackWebViewState extends State<VidstackWebView>
         child: InAppWebView(
           initialSettings: InAppWebViewSettings(
             javaScriptEnabled: true,
+            allowFileAccessFromFileURLs: true,
+            allowsInlineMediaPlayback: true,
+            allowUniversalAccessFromFileURLs: true,
+            mediaPlaybackRequiresUserGesture: false,
           ),
           onWebViewCreated: _initializeWebViewController,
         ));

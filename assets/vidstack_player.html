@@ -93,9 +93,6 @@
         };
 
         onChunkDownloaded = (bytesLength, downloadSource) => {
-          const statsSpan = document.getElementById("stats");
-          statsSpan.innerText = `Downloaded ${bytesLength} bytes from ${downloadSource}`;
-
           if (downloadSource === "http") {
             this.stats.httpDownloadedBytes += bytesLength;
           } else if (downloadSource === "p2p") {
@@ -211,7 +208,6 @@
   </head>
 
   <body>
-    <span id="stats"></span>
     <div id="target"></div>
   </body>
 </html>
