@@ -10,10 +10,10 @@ class VidstackPlayerScreen extends StatefulWidget {
 }
 
 class _VidstackPlayerScreenState extends State<VidstackPlayerScreen> {
+  final Set<String> _activePeers = {};
   double _totalHttpDownloaded = 0;
   double _totalP2PDownloaded = 0;
   double _totalP2PUploaded = 0;
-  final Set<String> _activePeers = {};
 
   void _updateHttpDownloadStats(double httpDownloaded) {
     setState(() {

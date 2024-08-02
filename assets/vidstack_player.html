@@ -18,11 +18,14 @@
     <script src="https://cdn.vidstack.io/player" type="module"></script>
 
     <script type="module">
+      import {
+        VidstackPlayer,
+        VidstackPlayerLayout,
+      } from "https://cdn.vidstack.io/player";
       import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 
       class P2P {
         constructor() {
-          this.player = document.querySelector("media-player");
           this.hlsP2PEngine = null;
           this.stats = {
             httpDownloadedBytes: 0,
@@ -33,7 +36,14 @@
           this.init();
         }
 
-        init = () => {
+        init = async () => {
+          this.player = await VidstackPlayer.create({
+            target: "#target",
+            src: "https://cph-p2p-msl.akamaized.net//hls/live/2000341/test/master.m3u8",
+            playInline: true,
+            layout: new VidstackPlayerLayout(),
+          });
+
           this.setupEventListeners();
           this.startStatsInterval();
         };
@@ -86,6 +96,7 @@
         };
 
         onChunkDownloaded = (bytesLength, downloadSource) => {
+          console.log("onChunkDownloaded", bytesLength, downloadSource);
           if (downloadSource === "http") {
             this.stats.httpDownloadedBytes += bytesLength;
           } else if (downloadSource === "p2p") {
@@ -190,21 +201,12 @@
       body {
         margin: 0;
         padding: 0;
-        width: 100vw;
         background-color: transparent;
       }
     </style>
   </head>
 
   <body>
-    <div>
-      <media-player
-        playsInline
-        src="https://cph-p2p-msl.akamaized.net//hls/live/2000341/test/master.m3u8"
-      >
-        <media-provider></media-provider>
-        <media-video-layout></media-video-layout>
-      </media-player>
-    </div>
+    <div id="target"></div>
   </body>
 </html>
