@@ -10,18 +10,15 @@
     <script type="importmap">
       {
         "imports": {
+          "vidstack-player": "https://cdn.vidstack.io/player",
           "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^1/dist/p2p-media-loader-core.es.min.js",
           "p2p-media-loader-hlsjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^1/dist/p2p-media-loader-hlsjs.es.min.js"
         }
       }
     </script>
-    <script src="https://cdn.vidstack.io/player" type="module"></script>
 
     <script type="module">
-      import {
-        VidstackPlayer,
-        VidstackPlayerLayout,
-      } from "https://cdn.vidstack.io/player";
+      import { VidstackPlayer, VidstackPlayerLayout } from "vidstack-player";
       import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 
       class P2P {
@@ -40,8 +37,8 @@
           this.player = await VidstackPlayer.create({
             target: "#target",
             src: "https://cph-p2p-msl.akamaized.net//hls/live/2000341/test/master.m3u8",
-            playInline: true,
             layout: new VidstackPlayerLayout(),
+            playsInline: true,
           });
 
           this.setupEventListeners();
