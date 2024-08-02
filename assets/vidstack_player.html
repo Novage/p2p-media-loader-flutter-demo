@@ -85,14 +85,17 @@
         };
 
         onPeerConnect = (params) => {
-          window.onPeerConnect?.postMessage(JSON.stringify(params));
+          window.flutter_inappwebview?.callHandler("onPeerConnect", params);
         };
 
         onPeerClose = (params) => {
-          window.onPeerClose?.postMessage(JSON.stringify(params));
+          window.flutter_inappwebview?.callHandler("onPeerClose", params);
         };
 
         onChunkDownloaded = (bytesLength, downloadSource) => {
+          const statsSpan = document.getElementById("stats");
+          statsSpan.innerText = `Downloaded ${bytesLength} bytes from ${downloadSource}`;
+
           if (downloadSource === "http") {
             this.stats.httpDownloadedBytes += bytesLength;
           } else if (downloadSource === "p2p") {
@@ -131,13 +134,18 @@
         };
 
         postDownloadStats = (downloadedBytes, downloadSource) => {
-          const stats = { downloadedBytes, downloadSource };
-          window.onChunkDownloaded?.postMessage(JSON.stringify(stats));
+          window.flutter_inappwebview?.callHandler(
+            "onChunkDownloaded",
+            downloadedBytes,
+            downloadSource
+          );
         };
 
         postUploadStats = (uploadedBytes) => {
-          const stats = { uploadedBytes };
-          window.onChunkUploaded?.postMessage(JSON.stringify(stats));
+          window.flutter_inappwebview?.callHandler(
+            "onChunkUploaded",
+            uploadedBytes
+          );
         };
 
         destroyP2P = () => {
@@ -203,6 +211,7 @@
   </head>
 
   <body>
+    <span id="stats"></span>
     <div id="target"></div>
   </body>
 </html>

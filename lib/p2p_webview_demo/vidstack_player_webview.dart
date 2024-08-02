@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 double convertToMiB(double bytes) => bytes / 1024 / 1024;
 
@@ -32,89 +30,67 @@ class VidstackWebView extends StatefulWidget {
 
 class _VidstackWebViewState extends State<VidstackWebView>
     with WidgetsBindingObserver {
-  late final WebViewController _controller;
+  late InAppWebViewController? _controller;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initializeWebViewController();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _destroyP2P();
+    _controller?.dispose();
     super.dispose();
   }
 
-  void _initializeWebViewController() {
-    late final PlatformWebViewControllerCreationParams params;
+  void _initializeWebViewController(InAppWebViewController controller) {
+    _controller = controller;
 
-    void onPeerConnected(JavaScriptMessage msg) {
-      final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
-      final peerToAdd = msgData['peerId'] as String?;
-      if (peerToAdd == null || peerToAdd.isEmpty) return;
+    _controller?.addJavaScriptHandler(
+        handlerName: 'onPeerConnect',
+        callback: (args) {
+          final peerToAdd = args[0].peerId as String?;
+          if (peerToAdd == null || peerToAdd.isEmpty) return;
+          widget.onPeerConnect?.call(peerToAdd);
+        });
 
-      widget.onPeerConnect?.call(peerToAdd);
-    }
+    _controller?.addJavaScriptHandler(
+        handlerName: 'onPeerClose',
+        callback: (args) {
+          final peerToRemove = args[0].peerId as String?;
+          if (peerToRemove == null || peerToRemove.isEmpty) return;
+          widget.onPeerClose?.call(peerToRemove);
+        });
 
-    void onPeerClose(JavaScriptMessage msg) {
-      final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
-      final peerToRemove = msgData['peerId'] as String?;
-      if (peerToRemove == null || peerToRemove.isEmpty) return;
+    _controller?.addJavaScriptHandler(
+        handlerName: 'onChunkDownloaded',
+        callback: (args) {
+          final downloadedBytes = (args[0] as num?)?.toDouble();
+          final downloadSource = args[1] as String?;
+          if (downloadedBytes == null || downloadSource == null) return;
 
-      widget.onPeerClose?.call(peerToRemove);
-    }
+          final downloadedBytesInMiB = convertToMiB(downloadedBytes);
 
-    void onChunkDownloaded(JavaScriptMessage msg) {
-      final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
-      final downloadedBytes = (msgData['downloadedBytes'] as num?)?.toDouble();
-      final downloadSource = msgData['downloadSource'] as String?;
-      if (downloadedBytes == null || downloadSource == null) return;
+          if (downloadSource == 'http') {
+            widget.onChunkDownloadedByHttp?.call(downloadedBytesInMiB);
+          } else if (downloadSource == 'p2p') {
+            widget.onChunkDownloadedByP2P?.call(downloadedBytesInMiB);
+          }
+        });
 
-      final downloadedBytesInMiB = convertToMiB(downloadedBytes);
+    _controller?.addJavaScriptHandler(
+        handlerName: 'onChunkUploaded',
+        callback: (args) {
+          final uploadedBytes = (args[0] as num?)?.toDouble();
+          if (uploadedBytes == null) return;
 
-      if (downloadSource == 'http') {
-        widget.onChunkDownloadedByHttp?.call(downloadedBytesInMiB);
-      } else if (downloadSource == 'p2p') {
-        widget.onChunkDownloadedByP2P?.call(downloadedBytesInMiB);
-      }
-    }
+          widget.onChunkUploaded?.call(convertToMiB(uploadedBytes));
+        });
 
-    void onChunkUploaded(JavaScriptMessage msg) {
-      final msgData = jsonDecode(msg.message) as Map<String, dynamic>;
-      final uploadedBytes = (msgData['uploadedBytes'] as num?)?.toDouble();
-      if (uploadedBytes == null) return;
-
-      widget.onChunkUploaded?.call(convertToMiB(uploadedBytes));
-    }
-
-    if (WebViewPlatform.instance is WebKitWebViewPlatform) {
-      params = WebKitWebViewControllerCreationParams(
-        allowsInlineMediaPlayback: true,
-        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
-      );
-    } else {
-      params = const PlatformWebViewControllerCreationParams();
-    }
-
-    _controller = WebViewController.fromPlatformCreationParams(params)
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..addJavaScriptChannel("onPeerConnect",
-          onMessageReceived: onPeerConnected)
-      ..addJavaScriptChannel("onPeerClose", onMessageReceived: onPeerClose)
-      ..addJavaScriptChannel("onChunkDownloaded",
-          onMessageReceived: onChunkDownloaded)
-      ..addJavaScriptChannel("onChunkUploaded",
-          onMessageReceived: onChunkUploaded);
-
-    if (_controller.platform is AndroidWebViewController) {
-      (_controller.platform as AndroidWebViewController)
-          .setMediaPlaybackRequiresUserGesture(false);
-    }
-
-    _controller.loadFlutterAsset(widget.assetPath);
+    _controller?.loadFile(assetFilePath: widget.assetPath);
   }
 
   @override
@@ -127,18 +103,23 @@ class _VidstackWebViewState extends State<VidstackWebView>
   }
 
   void _updateP2PState(bool isP2PDisabled) {
-    _controller.runJavaScript("window.updateP2PState($isP2PDisabled)");
+    _controller?.evaluateJavascript(
+        source: "window.updateP2PState($isP2PDisabled)");
   }
 
   void _destroyP2P() {
-    _controller.runJavaScript("window.destroyP2P()");
+    _controller?.evaluateJavascript(source: "window.destroyP2P()");
   }
 
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
-      aspectRatio: widget.aspectRatio,
-      child: WebViewWidget(controller: _controller),
-    );
+        aspectRatio: widget.aspectRatio,
+        child: InAppWebView(
+          initialSettings: InAppWebViewSettings(
+            javaScriptEnabled: true,
+          ),
+          onWebViewCreated: _initializeWebViewController,
+        ));
   }
 }
