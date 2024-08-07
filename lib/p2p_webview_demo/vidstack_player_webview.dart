@@ -48,9 +48,11 @@ class _VidstackWebViewState extends State<VidstackWebView>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _controller?.resumeTimers();
       _updateP2PState(false);
     } else if (state == AppLifecycleState.paused) {
       _updateP2PState(true);
+      _controller?.pauseTimers();
     }
   }
 
@@ -131,7 +133,6 @@ class _VidstackWebViewState extends State<VidstackWebView>
         child: InAppWebView(
           initialSettings: InAppWebViewSettings(
             javaScriptEnabled: true,
-            allowFileAccessFromFileURLs: true,
             allowsInlineMediaPlayback: true,
             allowUniversalAccessFromFileURLs: true,
             mediaPlaybackRequiresUserGesture: false,
