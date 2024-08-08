@@ -50,6 +50,14 @@
             "provider-change",
             this.onProviderChange
           );
+
+          this.player.addEventListener("play", () => {
+            updateP2PState(false);
+          });
+
+          this.player.addEventListener("pause", () => {
+            updateP2PState(true);
+          });
         };
 
         onProviderChange = (event) => {
@@ -64,6 +72,9 @@
           provider.library = HlsWithP2P;
           provider.config = {
             p2p: {
+              core: {
+                isP2PDisabled: true,
+              },
               onHlsJsCreated: this.onHlsJsCreated,
             },
           };

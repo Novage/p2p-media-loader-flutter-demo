@@ -27,33 +27,14 @@ class VidstackWebView extends StatefulWidget {
   State<VidstackWebView> createState() => _VidstackWebViewState();
 }
 
-class _VidstackWebViewState extends State<VidstackWebView>
-    with WidgetsBindingObserver {
+class _VidstackWebViewState extends State<VidstackWebView> {
   late InAppWebViewController? _controller;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _destroyP2P();
     _cleanUpWebView();
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _controller?.resumeTimers();
-      _updateP2PState(false);
-    } else if (state == AppLifecycleState.paused) {
-      _updateP2PState(true);
-      _controller?.pauseTimers();
-    }
   }
 
   void _cleanUpWebView() {
@@ -115,11 +96,6 @@ class _VidstackWebViewState extends State<VidstackWebView>
     final uploadedBytes = (args[0] as num?)?.toDouble();
     if (uploadedBytes == null) return;
     widget.onChunkUploaded?.call(convertToMiB(uploadedBytes));
-  }
-
-  void _updateP2PState(bool isP2PDisabled) {
-    _controller?.evaluateJavascript(
-        source: "window.updateP2PState($isP2PDisabled)");
   }
 
   void _destroyP2P() {
