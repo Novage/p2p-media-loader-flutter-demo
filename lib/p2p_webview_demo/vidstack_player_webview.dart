@@ -28,25 +28,7 @@ class VidstackWebView extends StatefulWidget {
 }
 
 class _VidstackWebViewState extends State<VidstackWebView> {
-  late InAppWebViewController? _controller;
-
-  @override
-  void dispose() {
-    _destroyP2P();
-    _cleanUpWebView();
-    super.dispose();
-  }
-
-  void _cleanUpWebView() {
-    _controller?.removeJavaScriptHandler(handlerName: 'onPeerConnect');
-    _controller?.removeJavaScriptHandler(handlerName: 'onPeerClose');
-    _controller?.removeJavaScriptHandler(handlerName: 'onChunkDownloaded');
-    _controller?.removeJavaScriptHandler(handlerName: 'onChunkUploaded');
-    _controller?.dispose();
-  }
-
   void _initializeWebViewController(InAppWebViewController controller) {
-    _controller = controller;
     _applyJavaScriptHandlers(controller);
     controller.loadFile(assetFilePath: widget.assetPath);
   }
@@ -96,10 +78,6 @@ class _VidstackWebViewState extends State<VidstackWebView> {
     final uploadedBytes = (args[0] as num?)?.toDouble();
     if (uploadedBytes == null) return;
     widget.onChunkUploaded?.call(convertToMiB(uploadedBytes));
-  }
-
-  void _destroyP2P() {
-    _controller?.evaluateJavascript(source: "window.destroyP2P()");
   }
 
   @override
