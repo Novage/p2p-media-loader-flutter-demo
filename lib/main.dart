@@ -1,5 +1,5 @@
-import 'package:demo/demo/vidstack_player.dart';
 import 'package:flutter/material.dart';
+import './screens/demo_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -36,7 +36,8 @@ class HomeScreen extends StatelessWidget {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const VidstackPlayer()),
+                MaterialPageRoute(
+                    builder: (context) => const VidstackPlayerScreen()),
               );
             },
             child: const Text('Open Demo Component')),
