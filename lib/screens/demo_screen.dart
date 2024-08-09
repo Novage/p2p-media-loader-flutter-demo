@@ -63,6 +63,11 @@ class _VidstackPlayerScreenState extends State<VidstackPlayerScreen> {
               onPeerClose: _removeActivePeer,
             ),
             const SizedBox(height: 20),
+            const Text(
+              'P2P Media Loader Statistics',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 15),
             P2PStatistics(
               totalHttpDownloaded: _totalHttpDownloaded,
               totalP2PDownloaded: _totalP2PDownloaded,
