@@ -1,12 +1,13 @@
-name: "Build"
+name: "Build IOS & Android"
 
 on:
   pull_request:
     branches:
-      - dev
+      - main
   push:
     branches:
       - dev
+      - main
 
 jobs:
   build:
@@ -23,8 +24,14 @@ jobs:
 
       - run: flutter  --version
 
+      - name: Flutter analyze
+        run: flutter analyze
+
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build
+      - name: Build IOS
         run: flutter build ios --release --no-codesign
+
+      - name: Build Android
+        run: flutter build apk --release
