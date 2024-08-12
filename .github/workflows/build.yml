@@ -4,10 +4,6 @@ on:
   pull_request:
     branches:
       - main
-  push:
-    branches:
-      - dev
-      - main
 
 jobs:
   build:
@@ -32,6 +28,12 @@ jobs:
 
       - name: Build IOS
         run: flutter build ios --release --no-codesign
+
+      - name: Set Up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "oracle"
+          java-version: "21"
 
       - name: Build Android
         run: flutter build apk --release
