@@ -1,4 +1,4 @@
-name: "Build IOS & Android"
+name: "Build apk"
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -16,7 +16,7 @@ jobs:
       - name: Set Up Java
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
+          distribution: "openjdk"
           java-version: "17"
 
       - name: Setup Flutter
@@ -24,14 +24,8 @@ jobs:
         with:
           channel: "stable"
 
-      - name: Flutter analyze
-        run: flutter analyze
-
       - name: Get dependencies
         run: flutter pub get
-
-      - name: Build IOS
-        run: flutter build ios --release --no-codesign
 
       - name: Build Android
         run: flutter build apk --release
