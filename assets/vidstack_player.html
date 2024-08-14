@@ -3,69 +3,224 @@
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
+    <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
+
     <script src="https://cdn.jsdelivr.net/npm/hls.js@~1/dist/hls.min.js"></script>
     <script type="importmap">
       {
         "imports": {
+          "vidstack-player": "https://cdn.vidstack.io/player",
           "p2p-media-loader-core": "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@^1/dist/p2p-media-loader-core.es.min.js",
           "p2p-media-loader-hlsjs": "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@^1/dist/p2p-media-loader-hlsjs.es.min.js"
         }
       }
     </script>
 
-    <link rel="stylesheet" href="https://cdn.vidstack.io/player/theme.css" />
-    <link rel="stylesheet" href="https://cdn.vidstack.io/player/video.css" />
+    <script type="module">
+      import { VidstackPlayer, VidstackPlayerLayout } from "vidstack-player";
+      import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
 
-    <script src="https://cdn.vidstack.io/player" type="module"></script>
+      class P2P {
+        constructor() {
+          this.hlsP2PEngine = null;
+          this.stats = {
+            httpDownloadedBytes: 0,
+            p2pDownloadedBytes: 0,
+            p2pUploadedBytes: 0,
+          };
+
+          this.init();
+        }
+
+        init = async () => {
+          this.player = await VidstackPlayer.create({
+            target: "#target",
+            src: "https://cph-p2p-msl.akamaized.net//hls/live/2000341/test/master.m3u8",
+            layout: new VidstackPlayerLayout(),
+            playsInline: true,
+          });
+
+          this.setupEventListeners();
+          this.startStatsInterval();
+        };
+
+        setupEventListeners = () => {
+          this.player.addEventListener(
+            "provider-change",
+            this.onProviderChange
+          );
+
+          this.player.addEventListener("play", () => {
+            updateP2PState(false);
+          });
+
+          this.player.addEventListener("pause", () => {
+            updateP2PState(true);
+          });
+        };
+
+        onProviderChange = (event) => {
+          const provider = event.detail;
+          if (provider?.type === "hls") {
+            this.setupHlsProvider(provider);
+          }
+        };
+
+        setupHlsProvider = (provider) => {
+          const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
+          provider.library = HlsWithP2P;
+          provider.config = {
+            p2p: {
+              core: {
+                isP2PDisabled: true,
+              },
+              onHlsJsCreated: this.onHlsJsCreated,
+            },
+          };
+        };
+
+        onHlsJsCreated = (hls) => {
+          this.hlsP2PEngine = hls.p2pEngine;
+          this.setupP2PEventListeners(hls.p2pEngine);
+        };
+
+        setupP2PEventListeners = (p2pEngine) => {
+          p2pEngine.addEventListener("onPeerConnect", this.onPeerConnect);
+          p2pEngine.addEventListener("onPeerClose", this.onPeerClose);
+          p2pEngine.addEventListener(
+            "onChunkDownloaded",
+            this.onChunkDownloaded
+          );
+          p2pEngine.addEventListener("onChunkUploaded", this.onChunkUploaded);
+        };
+
+        onPeerConnect = (params) => {
+          window.flutter_inappwebview?.callHandler("onPeerConnect", params);
+        };
+
+        onPeerClose = (params) => {
+          window.flutter_inappwebview?.callHandler("onPeerClose", params);
+        };
+
+        onChunkDownloaded = (bytesLength, downloadSource) => {
+          if (downloadSource === "http") {
+            this.stats.httpDownloadedBytes += bytesLength;
+          } else if (downloadSource === "p2p") {
+            this.stats.p2pDownloadedBytes += bytesLength;
+          }
+        };
+
+        onChunkUploaded = (bytesLength) => {
+          this.stats.p2pUploadedBytes += bytesLength;
+        };
+
+        startStatsInterval = () => {
+          this.statsInterval = setInterval(this.postStats, 1000);
+        };
+
+        stopStatsInterval = () => {
+          clearInterval(this.statsInterval);
+          this.statsInterval = undefined;
+        };
+
+        postStats = () => {
+          if (this.stats.p2pUploadedBytes > 0) {
+            this.postUploadStats(this.stats.p2pUploadedBytes);
+            this.stats.p2pUploadedBytes = 0;
+          }
+
+          if (this.stats.httpDownloadedBytes > 0) {
+            this.postDownloadStats(this.stats.httpDownloadedBytes, "http");
+            this.stats.httpDownloadedBytes = 0;
+          }
+
+          if (this.stats.p2pDownloadedBytes > 0) {
+            this.postDownloadStats(this.stats.p2pDownloadedBytes, "p2p");
+            this.stats.p2pDownloadedBytes = 0;
+          }
+        };
+
+        postDownloadStats = (downloadedBytes, downloadSource) => {
+          window.flutter_inappwebview?.callHandler(
+            "onChunkDownloaded",
+            downloadedBytes,
+            downloadSource
+          );
+        };
+
+        postUploadStats = (uploadedBytes) => {
+          window.flutter_inappwebview?.callHandler(
+            "onChunkUploaded",
+            uploadedBytes
+          );
+        };
+
+        destroyP2P = () => {
+          this.stopStatsInterval();
+          if (!this.hlsP2PEngine) return;
+
+          this.hlsP2PEngine.removeEventListener(
+            "onPeerConnect",
+            this.onPeerConnect
+          );
+          this.hlsP2PEngine.removeEventListener(
+            "onPeerClose",
+            this.onPeerClose
+          );
+          this.hlsP2PEngine.removeEventListener(
+            "onChunkDownloaded",
+            this.onChunkDownloaded
+          );
+          this.hlsP2PEngine.removeEventListener(
+            "onChunkUploaded",
+            this.onChunkUploaded
+          );
+
+          this.hlsP2PEngine.destroy();
+          this.hlsP2PEngine = undefined;
+        };
+
+        updateP2PState = (isDisabled) => {
+          if (!this.hlsP2PEngine) return;
+          const currentState =
+            this.hlsP2PEngine.getConfig().core.mainStream.isP2PDisabled;
+
+          if (currentState === isDisabled) return;
+
+          this.hlsP2PEngine.applyDynamicConfig({
+            core: { isP2PDisabled: isDisabled },
+          });
+
+          if (isDisabled) {
+            this.stopStatsInterval();
+          } else {
+            this.startStatsInterval();
+          }
+        };
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const p2p = new P2P();
+
+        window.updateP2PState = p2p.updateP2PState;
+
+        window.addEventListener("unload", () => {
+          p2p.destroyP2P();
+        });
+      });
+    </script>
 
     <style>
       html,
       body {
         margin: 0;
         padding: 0;
-        width: 100vw;
-        background-color: transparent;
       }
     </style>
-
-    <script type="module">
-      import { HlsJsP2PEngine } from "p2p-media-loader-hlsjs";
-
-      const player = document.querySelector("media-player");
-      const HlsWithP2P = HlsJsP2PEngine.injectMixin(window.Hls);
-
-      player.addEventListener("provider-change", (event) => {
-        const provider = event.detail;
-
-        if (provider?.type === "hls") {
-          provider.library = HlsWithP2P;
-
-          provider.config = {
-            p2p: {
-              core: {
-                swarmId: "Optional custom swarm ID for stream",
-              },
-              onHlsJsCreated: (hls) => {
-                hls.p2pEngine.addEventListener("onPeerConnect", (params) => {
-                  console.log("Peer connected:", params.peerId);
-                });
-              },
-            },
-          };
-        }
-      });
-    </script>
   </head>
 
   <body>
-    <div>
-      <media-player
-        playsInline
-        src="https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8"
-      >
-        <media-provider></media-provider>
-        <media-video-layout></media-video-layout>
-      </media-player>
-    </div>
+    <div id="target"></div>
   </body>
 </html>
